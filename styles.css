@@ -1,4 +1,11 @@
-/* Sets all the text color to red! */
-body {
-    color: red;
+span.spacer1 {
+    width: 1em;
+}
+
+span.spacer2 {
+    width: 2em;
+}
+
+span.spacer3 {
+    width: 3em;
 }

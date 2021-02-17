@@ -1,60 +1,58 @@
-import { App, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { addIcon, App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { Guid } from "guid-typescript";
+import { Console } from 'console';
 
-interface MyPluginSettings {
-	mySetting: string;
+interface AutoTextReplacePluginSettings {
+	entries: SettingEntry[];
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+interface SettingEntry {
+	id: Guid;
+	matchStr: string;
+	replacement: string;
+	applyOnPaste: boolean;
+	excludeCodeBlocks: boolean;
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+const DEFAULT_SETTINGS: AutoTextReplacePluginSettings = {
+	entries: []
+}
+
+export default class AutoTextReplacePlugin extends Plugin {
+	settings: AutoTextReplacePluginSettings;
+	private prevCursorPosition: CodeMirror.Position;
+
+	// cmEditors is used during unload to remove our event handlers.
+	private cmEditors: CodeMirror.Editor[];
 
 	async onload() {
-		console.log('loading plugin');
+		console.log('loading obsidian-auto-text-replace');
 
 		await this.loadSettings();
 
-		this.addRibbonIcon('dice', 'Sample Plugin', () => {
-			new Notice('This is a notice!');
+		this.addSettingTab(new AutoTextReplaceSettingTab(this.app, this));
+
+		this.cmEditors = [];
+		this.registerCodeMirror((cm) => {
+			this.cmEditors.push(cm);
+			cm.on('keyup', this.handleKeyUp);
+			cm.on('keydown', this.handleKeyDown);
 		});
 
-		this.addStatusBarItem().setText('Status Bar Text');
-
-		this.addCommand({
-			id: 'open-sample-modal',
-			name: 'Open Sample Modal',
-			// callback: () => {
-			// 	console.log('Simple Callback');
-			// },
-			checkCallback: (checking: boolean) => {
-				let leaf = this.app.workspace.activeLeaf;
-				if (leaf) {
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
-					return true;
-				}
-				return false;
-			}
-		});
-
-		this.addSettingTab(new SampleSettingTab(this.app, this));
-
-		this.registerCodeMirror((cm: CodeMirror.Editor) => {
-			console.log('codemirror', cm);
-		});
-
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
-		});
-
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+		addIcon('add', `
+		<svg class="widget-icon" enable-background="new 0 0 24 24" viewBox="0 0 24 24" width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+			<path d="M11 11V7h2v4h4v2h-4v4h-2v-4H7v-2h4zm1 11C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm0-2a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" />
+		</svg>
+		`);
 	}
 
 	onunload() {
-		console.log('unloading plugin');
+		console.log('unloading obsidian-auto-text-replace');
+
+		this.cmEditors.forEach((cm) => {
+			cm.off('keyup', this.handleKeyUp);
+			cm.off('keydown', this.handleKeyDown);
+		});
 	}
 
 	async loadSettings() {
@@ -64,49 +62,172 @@ export default class MyPlugin extends Plugin {
 	async saveSettings() {
 		await this.saveData(this.settings);
 	}
+
+	private readonly handleKeyUp = (
+		editor: CodeMirror.Editor,
+		event: KeyboardEvent,
+	): void => {
+		// this.replaceOnPaste(editor);
+		this.replaceWhileTyping(editor);
+	};
+
+	// private replaceOnPaste(editor: CodeMirror.Editor): void {
+	// 	const curCursorPosition = editor.getCursor();
+	// 	getRange(this.prevCursorPosition.line, curCursorPosition.line + 1).forEach(line => {
+	// 		let tokens = editor.getLineTokens(line).filter(token => {
+	// 			if (this.prevCursorPosition.line === curCursorPosition.line) {
+	// 				return token.start >= this.prevCursorPosition.ch && token.end <= curCursorPosition.ch;
+	// 			}
+	// 			return (line === this.prevCursorPosition.line && token.start >= this.prevCursorPosition.ch)
+	// 				|| (line === curCursorPosition.line && token.end <= curCursorPosition.ch)
+	// 				|| (line > this.prevCursorPosition.line && line < curCursorPosition.line);
+	// 		});
+
+	// 		tokens.forEach(token => {
+	// 			this.replaceToken(token, editor);
+	// 		})
+	// 	});
+	// }
+
+	private replaceWhileTyping(editor: CodeMirror.Editor): void {
+		const curCursorPosition = editor.getCursor();
+		if (curCursorPosition.line !== this.prevCursorPosition.line || curCursorPosition.ch - this.prevCursorPosition.ch !== 1) {
+			return;
+		}
+		const token = editor.getTokenAt(curCursorPosition);
+		if (!token) {
+			return;
+		}
+		this.replaceToken(token, editor);
+	}
+
+	private replaceToken(token: CodeMirror.Token, editor: CodeMirror.Editor): void {
+		const entry = this.settings.entries.filter(entry => entry.matchStr && entry.matchStr.trim().length > 0 && entry.matchStr === token?.string).first();
+		if (!entry || (entry.excludeCodeBlocks && token.type?.contains('codeblock'))) {
+			return;
+		}
+		editor.replaceRange(entry.replacement, {ch: token.start, line: editor.getCursor().line}, {ch: token.end, line: editor.getCursor().line});
+	}
+
+	private readonly handleKeyDown = (
+		editor: CodeMirror.Editor,
+		event: KeyboardEvent,
+	): void => {
+		this.prevCursorPosition = editor.getCursor();
+	};
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
+class AutoTextReplaceSettingTab extends PluginSettingTab {
+	plugin: AutoTextReplacePlugin;
+	private placeholder: Setting = null;
 
-	onOpen() {
-		let {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		let {contentEl} = this;
-		contentEl.empty();
-	}
-}
-
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
-
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: AutoTextReplacePlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
 
 	display(): void {
-		let {containerEl} = this;
+		let { containerEl } = this;
 
 		containerEl.empty();
 
-		containerEl.createEl('h2', {text: 'Settings for my awesome plugin.'});
-
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue('')
-				.onChange(async (value) => {
-					console.log('Secret: ' + value);
-					this.plugin.settings.mySetting = value;
+			.setHeading()
+			.setName('Text Replacements')
+			.addExtraButton(extraButtonComponent => extraButtonComponent
+				.setIcon('add')
+				.setTooltip('Add a new text replacement entry')
+				.onClick(async () => {
+					const newEntry = {
+						id: Guid.create(),
+						matchStr: '',
+						replacement: '',
+						applyOnPaste: true,
+						excludeCodeBlocks: true
+					};
+					this.plugin.settings.entries.push(newEntry);
+					this.renderSettingEntry(newEntry, containerEl);
+					this.placeholder.settingEl.hide();
 					await this.plugin.saveSettings();
 				}));
+
+		this.placeholder = new Setting(containerEl)
+			.setName('No text replacement entries set')
+			.setDesc('To create one click the + icon in the upper right');
+		
+		if (this.plugin.settings.entries.length > 0) {
+			this.placeholder.settingEl.hide();
+		}
+
+		this.plugin.settings.entries.forEach((settingEntry:SettingEntry) => {
+			this.renderSettingEntry(settingEntry, containerEl);
+		});
+	}
+
+	private renderSettingEntry(settingEntry: SettingEntry, containerEl: HTMLElement): void {
+		let settingEl = new Setting(containerEl)
+			.setName('Replacement')
+			.addText(text => text
+				.setValue(settingEntry.matchStr)
+				.setPlaceholder('string to replace')
+				.onChange(async (value) => {
+					settingEntry.matchStr = value;
+					await this.plugin.saveSettings();
+				}))
+			.then(setting => setting.controlEl.createSpan({cls: 'spacer1'}))
+			.then(setting => setting.controlEl.appendText('to'))
+			.then(setting => setting.controlEl.createSpan({cls: 'spacer1'}))
+			.addText(text => text
+				.setValue(settingEntry.replacement)
+				.setPlaceholder('string to insert')
+				.onChange(async (value) => {
+					settingEntry.replacement = value;
+					await this.plugin.saveSettings();
+				}))
+			.then(setting => setting.controlEl.createSpan({cls: 'spacer3'}))
+			.then(setting => setting.controlEl.appendText('Exclude code blocks:'))
+			.then(setting => setting.controlEl.createSpan({cls: 'spacer1'}))
+			.addToggle(toggle => toggle
+				.setValue(settingEntry.excludeCodeBlocks)
+				.setTooltip('Whether to prevent this text replacement within code blocks')
+				.onChange(async (value) => {
+					settingEntry.excludeCodeBlocks = value;
+					await this.plugin.saveSettings();
+				}))
+			// .then(setting => setting.controlEl.createSpan({cls: 'spacer3'}))
+			// .then(setting => setting.controlEl.appendText('Apply to pasted text:'))
+			// .then(setting => setting.controlEl.createSpan({cls: 'spacer1'}))
+			// .addToggle(toggle => toggle
+			// 	.setValue(settingEntry.applyOnPaste)
+			// 	.setTooltip('Whether to apply this text replacement to text when it is pasted into a note')
+			// 	.onChange(async (value) => {
+			// 		settingEntry.applyOnPaste = value;
+			// 		await this.plugin.saveSettings();
+			// 	}))
+			.then(setting => setting.controlEl.createSpan({cls: 'spacer1'}))
+			.addExtraButton(extraButtonComponent => extraButtonComponent
+				.setIcon('trash')
+				.setTooltip('Remove this entry')
+				.onClick(async () => {
+					const entryToRemove = this.plugin.settings.entries.filter(entry => entry.id === settingEntry.id).first();
+					if (!entryToRemove) {
+						return;
+					}
+					this.plugin.settings.entries.remove(entryToRemove);
+					settingEl.remove();
+					if (this.plugin.settings.entries.length === 0) {
+						this.placeholder.settingEl.show();
+					}
+					await this.plugin.saveSettings();
+				})).settingEl;
 	}
 }
+
+function getRange(start:number, end:number):number[] {
+	if (!end) {
+	  end = start;
+	  start = 0;
+	}
+	if (!end || start > end) return [];
+	return Array.from(Array(end-start).keys()).map(v => v + start);
+  }
