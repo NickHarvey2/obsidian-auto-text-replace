@@ -8,4 +8,4 @@ Some example usages
   - For example, you can define a replacement that swaps in `⚠️` when you type `-warn-`
 - Replace a double en dash with a single em dash
 
-![[demo.gif]]
+![demo.gif](https://github.com/NickHarvey2/obsidian-auto-text-replace/blob/master/demo.gif)
