@@ -11,4 +11,4 @@ Some example usages
 ![demo](https://github.com/NickHarvey2/obsidian-auto-text-replace/blob/master/demo.gif)
 
 example config:
-![example config](https://github.com/NickHarvey2/obsidian-auto-text-replace/blob/master/example-config.gif)
+![example config](https://github.com/NickHarvey2/obsidian-auto-text-replace/blob/master/example-config.png)
