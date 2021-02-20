@@ -1,6 +1,5 @@
 import { addIcon, App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import { Guid } from "guid-typescript";
-import { Console } from 'console';
 
 interface AutoTextReplacePluginSettings {
 	entries: SettingEntry[];
@@ -67,34 +66,15 @@ export default class AutoTextReplacePlugin extends Plugin {
 		editor: CodeMirror.Editor,
 		event: KeyboardEvent,
 	): void => {
-		// this.replaceOnPaste(editor);
 		this.replaceWhileTyping(editor);
 	};
-
-	// private replaceOnPaste(editor: CodeMirror.Editor): void {
-	// 	const curCursorPosition = editor.getCursor();
-	// 	getRange(this.prevCursorPosition.line, curCursorPosition.line + 1).forEach(line => {
-	// 		let tokens = editor.getLineTokens(line).filter(token => {
-	// 			if (this.prevCursorPosition.line === curCursorPosition.line) {
-	// 				return token.start >= this.prevCursorPosition.ch && token.end <= curCursorPosition.ch;
-	// 			}
-	// 			return (line === this.prevCursorPosition.line && token.start >= this.prevCursorPosition.ch)
-	// 				|| (line === curCursorPosition.line && token.end <= curCursorPosition.ch)
-	// 				|| (line > this.prevCursorPosition.line && line < curCursorPosition.line);
-	// 		});
-
-	// 		tokens.forEach(token => {
-	// 			this.replaceToken(token, editor);
-	// 		})
-	// 	});
-	// }
 
 	private replaceWhileTyping(editor: CodeMirror.Editor): void {
 		const curCursorPosition = editor.getCursor();
 		if (curCursorPosition.line !== this.prevCursorPosition.line || curCursorPosition.ch - this.prevCursorPosition.ch !== 1) {
 			return;
 		}
-		const token = editor.getTokenAt(curCursorPosition);
+		const token = editor.getTokenAt({line: curCursorPosition.line, ch: editor.getTokenAt(curCursorPosition).start});
 		if (!token) {
 			return;
 		}
@@ -106,7 +86,7 @@ export default class AutoTextReplacePlugin extends Plugin {
 		if (!entry || (entry.excludeCodeBlocks && token.type?.contains('codeblock'))) {
 			return;
 		}
-		editor.replaceRange(entry.replacement, {ch: token.start, line: editor.getCursor().line}, {ch: token.end, line: editor.getCursor().line});
+		editor.replaceRange(entry.replacement, { ch: token.start, line: editor.getCursor().line }, { ch: token.end, line: editor.getCursor().line });
 	}
 
 	private readonly handleKeyDown = (
@@ -154,12 +134,12 @@ class AutoTextReplaceSettingTab extends PluginSettingTab {
 		this.placeholder = new Setting(containerEl)
 			.setName('No text replacement entries set')
 			.setDesc('To create one click the + icon in the upper right');
-		
+
 		if (this.plugin.settings.entries.length > 0) {
 			this.placeholder.settingEl.hide();
 		}
 
-		this.plugin.settings.entries.forEach((settingEntry:SettingEntry) => {
+		this.plugin.settings.entries.forEach((settingEntry: SettingEntry) => {
 			this.renderSettingEntry(settingEntry, containerEl);
 		});
 	}
@@ -174,9 +154,9 @@ class AutoTextReplaceSettingTab extends PluginSettingTab {
 					settingEntry.matchStr = value;
 					await this.plugin.saveSettings();
 				}))
-			.then(setting => setting.controlEl.createSpan({cls: 'spacer1'}))
+			.then(setting => setting.controlEl.createSpan({ cls: 'spacer1' }))
 			.then(setting => setting.controlEl.appendText('to'))
-			.then(setting => setting.controlEl.createSpan({cls: 'spacer1'}))
+			.then(setting => setting.controlEl.createSpan({ cls: 'spacer1' }))
 			.addText(text => text
 				.setValue(settingEntry.replacement)
 				.setPlaceholder('string to insert')
@@ -184,9 +164,9 @@ class AutoTextReplaceSettingTab extends PluginSettingTab {
 					settingEntry.replacement = value;
 					await this.plugin.saveSettings();
 				}))
-			.then(setting => setting.controlEl.createSpan({cls: 'spacer3'}))
+			.then(setting => setting.controlEl.createSpan({ cls: 'spacer3' }))
 			.then(setting => setting.controlEl.appendText('Exclude code blocks:'))
-			.then(setting => setting.controlEl.createSpan({cls: 'spacer1'}))
+			.then(setting => setting.controlEl.createSpan({ cls: 'spacer1' }))
 			.addToggle(toggle => toggle
 				.setValue(settingEntry.excludeCodeBlocks)
 				.setTooltip('Whether to prevent this text replacement within code blocks')
@@ -194,17 +174,7 @@ class AutoTextReplaceSettingTab extends PluginSettingTab {
 					settingEntry.excludeCodeBlocks = value;
 					await this.plugin.saveSettings();
 				}))
-			// .then(setting => setting.controlEl.createSpan({cls: 'spacer3'}))
-			// .then(setting => setting.controlEl.appendText('Apply to pasted text:'))
-			// .then(setting => setting.controlEl.createSpan({cls: 'spacer1'}))
-			// .addToggle(toggle => toggle
-			// 	.setValue(settingEntry.applyOnPaste)
-			// 	.setTooltip('Whether to apply this text replacement to text when it is pasted into a note')
-			// 	.onChange(async (value) => {
-			// 		settingEntry.applyOnPaste = value;
-			// 		await this.plugin.saveSettings();
-			// 	}))
-			.then(setting => setting.controlEl.createSpan({cls: 'spacer1'}))
+			.then(setting => setting.controlEl.createSpan({ cls: 'spacer1' }))
 			.addExtraButton(extraButtonComponent => extraButtonComponent
 				.setIcon('trash')
 				.setTooltip('Remove this entry')
@@ -222,12 +192,3 @@ class AutoTextReplaceSettingTab extends PluginSettingTab {
 				})).settingEl;
 	}
 }
-
-function getRange(start:number, end:number):number[] {
-	if (!end) {
-	  end = start;
-	  start = 0;
-	}
-	if (!end || start > end) return [];
-	return Array.from(Array(end-start).keys()).map(v => v + start);
-  }
