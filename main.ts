@@ -1,4 +1,4 @@
-import { addIcon, App, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { addIcon, App, Plugin, PluginSettingTab, Setting } from 'obsidian';
 import { Guid } from "guid-typescript";
 
 interface AutoTextReplacePluginSettings {
@@ -71,22 +71,25 @@ export default class AutoTextReplacePlugin extends Plugin {
 
 	private replaceWhileTyping(editor: CodeMirror.Editor): void {
 		const curCursorPosition = editor.getCursor();
-		if (curCursorPosition.line !== this.prevCursorPosition.line || curCursorPosition.ch - this.prevCursorPosition.ch !== 1) {
-			return;
+		let token = null;
+		if (curCursorPosition.line === this.prevCursorPosition.line && curCursorPosition.ch - this.prevCursorPosition.ch === 1) {
+			token = editor.getTokenAt({line: curCursorPosition.line, ch: editor.getTokenAt(curCursorPosition).start});
+		} else if (curCursorPosition.line - this.prevCursorPosition.line === 1 && curCursorPosition.ch === 0) {
+			token = editor.getLineTokens(this.prevCursorPosition.line)?.last();
 		}
-		const token = editor.getTokenAt({line: curCursorPosition.line, ch: editor.getTokenAt(curCursorPosition).start});
+		
 		if (!token) {
 			return;
 		}
-		this.replaceToken(token, editor);
+		this.replaceToken(token, this.prevCursorPosition.line, editor);
 	}
 
-	private replaceToken(token: CodeMirror.Token, editor: CodeMirror.Editor): void {
+	private replaceToken(token: CodeMirror.Token, line: number, editor: CodeMirror.Editor): void {
 		const entry = this.settings.entries.filter(entry => entry.matchStr && entry.matchStr.trim().length > 0 && entry.matchStr === token?.string).first();
 		if (!entry || (entry.excludeCodeBlocks && token.type?.contains('codeblock'))) {
 			return;
 		}
-		editor.replaceRange(entry.replacement, { ch: token.start, line: editor.getCursor().line }, { ch: token.end, line: editor.getCursor().line });
+		editor.replaceRange(entry.replacement, { ch: token.start, line: line }, { ch: token.end, line: line });
 	}
 
 	private readonly handleKeyDown = (
