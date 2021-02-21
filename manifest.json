@@ -4,7 +4,7 @@
 	"version": "1.0.0",
 	"minAppVersion": "0.10.13",
 	"description": "Automatically replace strings. Can be used to expand abbreviations, and more.",
-	"author": "github.com/NickHarvey2",
-	"authorUrl": "",
+	"author": "Nick Harvey",
+	"authorUrl": "github.com/NickHarvey2",
 	"isDesktopOnly": false
 }
