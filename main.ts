@@ -74,7 +74,7 @@ export default class AutoTextReplacePlugin extends Plugin {
 		let token = null;
 		if (curCursorPosition.line === this.prevCursorPosition.line && curCursorPosition.ch - this.prevCursorPosition.ch === 1) {
 			token = editor.getTokenAt({line: curCursorPosition.line, ch: editor.getTokenAt(curCursorPosition).start});
-		} else if (curCursorPosition.line - this.prevCursorPosition.line === 1 && curCursorPosition.ch === 0) {
+		} else if (curCursorPosition.line - this.prevCursorPosition.line === 1) {
 			token = editor.getLineTokens(this.prevCursorPosition.line)?.last();
 		}
 		
@@ -113,6 +113,7 @@ class AutoTextReplaceSettingTab extends PluginSettingTab {
 		let { containerEl } = this;
 
 		containerEl.empty();
+		containerEl.addClass('settingContainer');
 
 		new Setting(containerEl)
 			.setHeading()
@@ -129,12 +130,17 @@ class AutoTextReplaceSettingTab extends PluginSettingTab {
 						excludeCodeBlocks: true
 					};
 					this.plugin.settings.entries.push(newEntry);
-					this.renderSettingEntry(newEntry, containerEl);
+					let entryEl = this.renderSettingEntry(newEntry, entryContainerEl);
 					this.placeholder.settingEl.hide();
+					entryEl.scrollIntoView({
+						block: "end"
+					});
 					await this.plugin.saveSettings();
 				}));
 
-		this.placeholder = new Setting(containerEl)
+		var entryContainerEl = containerEl.createDiv({cls: 'entryContainer'});
+
+		this.placeholder = new Setting(entryContainerEl)
 			.setName('No text replacement entries set')
 			.setDesc('To create one click the + icon in the upper right');
 
@@ -143,11 +149,11 @@ class AutoTextReplaceSettingTab extends PluginSettingTab {
 		}
 
 		this.plugin.settings.entries.forEach((settingEntry: SettingEntry) => {
-			this.renderSettingEntry(settingEntry, containerEl);
+			this.renderSettingEntry(settingEntry, entryContainerEl);
 		});
 	}
 
-	private renderSettingEntry(settingEntry: SettingEntry, containerEl: HTMLElement): void {
+	private renderSettingEntry(settingEntry: SettingEntry, containerEl: HTMLElement): HTMLElement {
 		let settingEl = new Setting(containerEl)
 			.setName('Replacement')
 			.addText(text => text
@@ -193,5 +199,6 @@ class AutoTextReplaceSettingTab extends PluginSettingTab {
 					}
 					await this.plugin.saveSettings();
 				})).settingEl;
+		return settingEl;
 	}
 }

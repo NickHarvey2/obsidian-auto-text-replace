@@ -9,3 +9,12 @@ span.spacer2 {
 span.spacer3 {
     width: 3em;
 }
+
+.settingContainer {
+    overflow: hidden;
+}
+
+.entryContainer {
+    overflow-y: auto;
+    height: 95%;
+}
